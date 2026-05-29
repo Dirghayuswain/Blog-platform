@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><title>Blog</title></head>
+<body>
+  <h2>Blog App</h2>
+  <div id="auth">
+    <input id="em" placeholder="Email"> <input id="pw" type="password" placeholder="Pass">
+    <button onclick="log()">Login</button> <button onclick="reg()">Reg</button>
+  </div>
+  
+  <div id="editor" style="display:none;"><br>
+    <input id="ttl" placeholder="Title"><br>
+    <textarea id="cnt" placeholder="Content"></textarea><br>
+    <button onclick="addPost()">Publish</button>
+  </div>
+
+  <h3>Feed</h3>
+  <div id="feed"></div>
+
+  <script>
+    let token = '', user = '';
+    const api = 'http://localhost:5000/api';
+
+    async function reg() { await fetch(`${api}/reg`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:v('em').split('@')[0], email:v('em'), pass:v('pw')}) }); alert('Registered'); }
+    async function log() { 
+      let r = await fetch(`${api}/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email:v('em'), pass:v('pw')}) });
+      let d = await r.json(); if(d.token) { token=d.token; user=d.username; document.getElementById('editor').style.display='block'; load(); }
+    }
+    async function load() {
+      let res = await fetch(`${api}/posts`); let posts = await res.json();
+      document.getElementById('feed').innerHTML = posts.map(p => `
+        <div>
+          <h4>${p.title} (by ${p.author})</h4><p>${p.content}</p>
+          <button onclick="del('${p._id}')">Delete</button>
+          <div id="cm-${p._id}"></div>
+          <input id="in-${p._id}"> <button onclick="comm('${p._id}')">Comment</button>
+        </div><hr>
+      `).join('');
+      posts.forEach(async p => {
+        let cr = await fetch(`${api}/comments/${p._id}`); let cm = await cr.json();
+        document.getElementById(`cm-${p._id}`).innerHTML = cm.map(c => `<p><b>${c.author}:</b> ${c.text}</p>`).join('');
+      });
+    }
+    async function addPost() { await fetch(`${api}/posts`, { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${token}`}, body: JSON.stringify({title:v('ttl'), content:v('cnt')}) }); load(); }
+    async function del(id) { await fetch(`${api}/posts/${id}`, { method:'DELETE', headers:{'Authorization':`Bearer ${token}`} }); load(); }
+    async function comm(id) { await fetch(`${api}/comments/${id}`, { method:'POST', headers:{'Content-Type':'application/json', 'Authorization':`Bearer ${token}`}, body: JSON.stringify({text:v(`in-${id}`)}) }); load(); }
+    function v(id) { return document.getElementById(id).value; }
+    load();
+  </script>
+</body>
+</html>
